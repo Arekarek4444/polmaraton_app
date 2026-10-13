@@ -8,7 +8,7 @@ import joblib
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
-from langfuse import get_client, observe
+from langfuse import get_client, observe, propagate_attributes
 from langfuse.openai import OpenAI
 from openai import AuthenticationError
 
@@ -97,16 +97,17 @@ def validate(data):
 
 @observe(name="ekstrakcja_danych_biegacza")
 def extract_runner_data(text):
-    response = get_openai_client().chat.completions.create(
-        model=OPENAI_MODEL,
-        temperature=0,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": text},
-        ],
-        name="ekstrakcja_json",  # nazwa generacji w Langfuse
-    )
+    with propagate_attributes(tags=["polmaraton"], metadata={"model": OPENAI_MODEL}):
+        response = get_openai_client().chat.completions.create(
+            model=OPENAI_MODEL,
+            temperature=0,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": text},
+            ],
+            name="ekstrakcja_json",  # nazwa generacji w Langfuse
+        )
     data = json.loads(response.choices[0].message.content)
     _, missing, problems = validate(data)
 
@@ -115,7 +116,6 @@ def extract_runner_data(text):
     langfuse.score_current_trace(name="dane_kompletne", value=int(not missing and not problems), data_type="BOOLEAN")
     langfuse.score_current_trace(name="liczba_brakujacych_pol", value=len(missing))
     langfuse.score_current_trace(name="poprawny_format", value=int(not problems), data_type="BOOLEAN")
-    langfuse.update_current_trace(tags=["polmaraton"], metadata={"model": OPENAI_MODEL})
 
     return data, langfuse.get_current_trace_id()
 
