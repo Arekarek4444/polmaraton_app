@@ -10,6 +10,7 @@ import streamlit as st
 from dotenv import load_dotenv
 from langfuse import get_client, observe
 from langfuse.openai import OpenAI
+from openai import AuthenticationError
 
 load_dotenv()
 
@@ -140,6 +141,9 @@ if st.button("Oszacuj czas", type="primary"):
     with st.spinner("Analizuję Twoją wypowiedź..."):
         try:
             data, trace_id = extract_runner_data(text)
+        except AuthenticationError:
+            st.error("Nieprawidłowy klucz OpenAI (OPENAI_API_KEY). Sprawdź konfigurację aplikacji.")
+            st.stop()
         except Exception as e:
             st.error(f"Nie udało się przetworzyć tekstu przez LLM: {e}")
             st.stop()
